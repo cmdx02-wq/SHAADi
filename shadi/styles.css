@@ -54,6 +54,7 @@ a {
     color: inherit;
 }
 
+
 /* ═══════════════════════════ UTILITY ═══════════════════════════ */
 .text-center { text-align: center; }
 .text-primary { color: var(--primary); }
@@ -913,6 +914,16 @@ a {
 }
 .recent-list {
     list-style: none;
+}
+.rsvp-btn{
+    display:inline-block;
+    padding:15px 35px;
+    background:#c8a165;
+    color:white;
+    text-decoration:none;
+    border-radius:50px;
+    font-size:18px;
+    font-weight:bold;
 }
 .recent-list li {
     display: flex;
