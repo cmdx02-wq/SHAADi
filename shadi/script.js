@@ -9,6 +9,9 @@ const STORAGE_KEYS = {
     SHAGUNS: 'shaadi_shaguns'
 };
 
+// Simple client-side admin password (change before publishing)
+const ADMIN_PASSWORD = 'password123';
+
 // ═══════════════════════════ UTILITIES ═══════════════════════════
 function getFromStorage(key) {
     try {
@@ -106,6 +109,7 @@ function initScrollAnimations() {
 // ═══════════════════════════ RSVP FORM ═══════════════════════════
 function initRSVPForm() {
     const form = document.getElementById('rsvpForm');
+    if (!form) return; // no inline RSVP form present (we link to Google Form)
     const attendeesGroup = document.getElementById('attendeesGroup');
     const radios = document.querySelectorAll('input[name="attending"]');
 
@@ -221,12 +225,21 @@ function updateDashboard() {
     const totalGuests = attendingRsvps.reduce((sum, r) => sum + (r.attendees_count || 0), 0);
     const totalShagun = shaguns.reduce((sum, s) => sum + (s.amount || 0), 0);
 
-    document.getElementById('statGuests').textContent = totalGuests;
-    document.getElementById('statGuestsSub').textContent = `${attendingRsvps.length} families saying yes`;
-    document.getElementById('statRSVP').textContent = rsvps.length;
-    document.getElementById('statShagun').textContent = `₹${fmtINR(totalShagun)}`;
-    document.getElementById('statShagunSub').textContent = `from ${shaguns.length} blessings`;
-    document.getElementById('statBlessings').textContent = shaguns.length;
+    // Show guests and RSVP counts publicly
+    const guestsEl = document.getElementById('statGuests');
+    const guestsSub = document.getElementById('statGuestsSub');
+    const rsvpEl = document.getElementById('statRSVP');
+    if (guestsEl) guestsEl.textContent = totalGuests;
+    if (guestsSub) guestsSub.textContent = `${attendingRsvps.length} families saying yes`;
+    if (rsvpEl) rsvpEl.textContent = rsvps.length;
+
+    // Update admin-only panel if signed in
+    if (isAdmin()) {
+        showAdminPanel(true);
+        updateAdminPanel();
+    } else {
+        showAdminPanel(false);
+    }
 
     // Recent RSVPs
     const rsvpList = document.getElementById('recentRSVPs');
@@ -268,6 +281,116 @@ function updateDashboard() {
     }
 }
 
+// ========== ADMIN AUTH ===========
+function isAdmin() {
+    return sessionStorage.getItem('shaadi_admin') === 'true';
+}
+
+function initAdmin() {
+    const footerBtn = document.getElementById('adminLoginBtn');
+    const floatBtn = document.getElementById('adminFloatingBtn');
+    const adminModal = document.getElementById('adminModal');
+    const adminForm = document.getElementById('adminLoginForm');
+    const adminCancel = document.getElementById('adminCancelBtn');
+
+    const openModal = () => {
+        if (adminModal) {
+            adminModal.style.display = 'flex';
+            const passInput = document.getElementById('adminPass');
+            if (passInput) passInput.focus();
+        }
+    };
+
+    const signOut = () => {
+        sessionStorage.removeItem('shaadi_admin');
+        showToast('Signed out');
+        updateDashboard();
+        replaceAdminControl(false);
+    };
+
+    [footerBtn, floatBtn].forEach((btn) => {
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            if (isAdmin()) {
+                signOut();
+                return;
+            }
+            openModal();
+        });
+    });
+
+    if (adminCancel) {
+        adminCancel.addEventListener('click', () => {
+            adminModal.style.display = 'none';
+        });
+    }
+
+    if (adminForm) {
+        adminForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const pass = document.getElementById('adminPass').value;
+
+            if (pass === ADMIN_PASSWORD) {
+                sessionStorage.setItem('shaadi_admin', 'true');
+                if (adminModal) adminModal.style.display = 'none';
+                showToast('Admin signed in');
+                updateDashboard();
+                // change footer control to sign out
+                replaceAdminControl(true);
+            } else {
+                showToast('Invalid password');
+            }
+        });
+    }
+
+    // Initialize footer control state
+    replaceAdminControl(isAdmin());
+}
+
+function replaceAdminControl(signedIn) {
+    const footerBtn = document.getElementById('adminLoginBtn');
+    if (!footerBtn) return;
+    if (signedIn) {
+        footerBtn.textContent = 'Admin: Sign out';
+        footerBtn.classList.add('signed-in');
+    } else {
+        footerBtn.textContent = 'Admin Login';
+        footerBtn.classList.remove('signed-in');
+    }
+}
+
+function showAdminPanel(show) {
+    const panel = document.getElementById('adminPanel');
+    if (!panel) return;
+    panel.style.display = show ? 'block' : 'none';
+}
+
+function updateAdminPanel() {
+    const shaguns = getFromStorage(STORAGE_KEYS.SHAGUNS);
+    const totalShagun = shaguns.reduce((sum, s) => sum + (s.amount || 0), 0);
+    const adminTotal = document.getElementById('adminTotalShagun');
+    const adminTotalSub = document.getElementById('adminTotalShagunSub');
+    if (adminTotal) adminTotal.textContent = `₹${fmtINR(totalShagun)}`;
+    if (adminTotalSub) adminTotalSub.textContent = `from ${shaguns.length} blessings`;
+
+    const list = document.getElementById('adminRecentShaguns');
+    if (!list) return;
+    if (shaguns.length === 0) {
+        list.innerHTML = '<li class="recent-empty">No shagun received yet.</li>';
+    } else {
+        const recentShaguns = shaguns.slice(0, 10);
+        list.innerHTML = recentShaguns.map(s => `
+            <li>
+                <div>
+                    <p class="recent-name">${escapeHtml(s.sender_name)}</p>
+                    ${s.message ? `<p class="recent-message">\u201C${escapeHtml(s.message)}\u201D</p>` : ''}
+                </div>
+                <span class="recent-amount">₹${fmtINR(s.amount)}</span>
+            </li>
+        `).join('');
+    }
+}
+
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -298,6 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initScrollAnimations();
     initRSVPForm();
     initShagunForm();
+    initAdmin();
     initSmoothScroll();
 
     // Load dashboard data
