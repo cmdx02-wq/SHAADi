@@ -397,6 +397,16 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// ═══════════════════════════ RESET DATA ═══════════════════════════
+function resetAllData() {
+    if (confirm('Are you sure? This will delete all RSVPs and Shagun data. This action cannot be undone.')) {
+        localStorage.removeItem(STORAGE_KEYS.RSVPS);
+        localStorage.removeItem(STORAGE_KEYS.SHAGUNS);
+        updateDashboard();
+        showToast('✓ All data has been reset to zero');
+    }
+}
+
 // ═══════════════════════════ SMOOTH SCROLL FOR HERO CTA ═══════════════════════════
 function initSmoothScroll() {
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
